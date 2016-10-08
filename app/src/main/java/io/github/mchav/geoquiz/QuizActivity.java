@@ -1,5 +1,7 @@
 package io.github.mchav.geoquiz;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -17,8 +19,13 @@ import android.widget.Toast;
 public class QuizActivity extends AppCompatActivity {
 
     private static final String TAG = "QuizActivity";
+    private static final String KEY_INDEX = "index";
+    private static final String CHEAT_INDEX = "cheat";
+    private static final int REQUEST_CODE_CHEAT = 0;
+
     private Button mTrueButton;
     private Button mFalseButton;
+    private Button mCheatButton;
     private ImageButton mNextButton;
     private ImageButton mPrevButton;
     private TextView mQuestionTextView;
@@ -31,12 +38,18 @@ public class QuizActivity extends AppCompatActivity {
         new Question(R.string.question_asia, true)
     };
 
+    private boolean[] mCheated = new boolean[mQuestionBank.length];
+
     private int mCurrentIndex = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate() called");
+
+        mCurrentIndex = savedInstanceState != null? savedInstanceState.getInt(KEY_INDEX): 0;
+        byte[] vals = savedInstanceState != null? savedInstanceState.getByteArray(CHEAT_INDEX): new byte[0];
+        for (int i = 0; i < vals.length; i++) mCheated[i] = vals[i] == 1;
+
         setContentView(R.layout.activity_quiz);
 
         mQuestionTextView = (TextView) findViewById(R.id.question_text_view);
@@ -64,6 +77,16 @@ public class QuizActivity extends AppCompatActivity {
             }
         });
 
+        mCheatButton = (Button) findViewById(R.id.cheat_button);
+        mCheatButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean answerIsTrue = mQuestionBank[mCurrentIndex].isAnswerTrue();
+                Intent i = CheatActivity.newIntent(QuizActivity.this, answerIsTrue);
+                startActivityForResult(i, REQUEST_CODE_CHEAT);
+            }
+        });
+
         mPrevButton = (ImageButton) findViewById(R.id.prev_button);
         mPrevButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -86,15 +109,28 @@ public class QuizActivity extends AppCompatActivity {
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+    }
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode != Activity.RESULT_OK) return;
+
+        if (requestCode == REQUEST_CODE_CHEAT && data != null) {
+            mCheated[mCurrentIndex] = CheatActivity.wasAnswerShown(data);
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        savedInstanceState.putInt(KEY_INDEX, mCurrentIndex);
+
+        // save answers
+        byte[] vals = new byte[mCheated.length];
+        for (int i = 0; i < vals.length; i++) {
+            vals[i] = (byte) (mCheated[i]? 1: 0);
+        }
+        savedInstanceState.putByteArray(CHEAT_INDEX, vals);
     }
 
     private void updateQuestion() {
@@ -105,37 +141,8 @@ public class QuizActivity extends AppCompatActivity {
     private void checkAnswer(boolean userPressedTrue) {
         boolean answerIsTrue = mQuestionBank[mCurrentIndex].isAnswerTrue();
         int messageResId = userPressedTrue == answerIsTrue ? R.string.correct_toast: R.string.incorrect_toast;
+        messageResId = mCheated[mCurrentIndex]? R.string.judgment_toast: messageResId;
         Toast.makeText(this, messageResId, Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-        Log.d(TAG, "onStart() called");
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        Log.d(TAG, "onPause() called");
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        Log.d(TAG, "onResume() called");
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-        Log.d(TAG, "onStop() called");
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        Log.d(TAG, "onDestory() called");
     }
 
     @Override
